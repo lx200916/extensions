@@ -22,6 +22,7 @@ export interface RefData {
   type?: string;
   citekey?: string;
   tags?: string[];
+  collections?: string[];
   attachment?: Attachment;
   [key: string]: any;
 }
@@ -63,6 +64,14 @@ SELECT tags.name AS name
     LEFT JOIN itemTags
         ON tags.tagID = itemTags.tagID
 WHERE itemTags.itemID = :id
+`;
+
+const COLLECTION_SQL = `
+SELECT collections.collectionName AS name
+    FROM collections
+    LEFT JOIN collectionItems
+        ON collections.collectionID = collectionItems.collectionID
+WHERE collectionItems.itemID = :id
 `;
 
 const BIBTEX_SQL = `
@@ -223,6 +232,7 @@ async function getData(): Promise<RefData[]> {
   const st1 = db.prepare(ITEMS_SQL.replace("?", iids));
 
   const rows = [];
+
   while (st1.step()) {
     const row = st1.getAsObject();
     const st2 = db.prepare(TAGS_SQL);
@@ -273,8 +283,20 @@ async function getData(): Promise<RefData[]> {
     }
     st5.free();
 
+
     if (cts.length > 0) {
       row.creators = cts;
+    }
+
+    const st6 = db.prepare(COLLECTION_SQL);
+    st6.bind({ ":id": row.id });
+    const col = [];
+    while (st6.step()) {
+      col.push(st6.getAsObject().name);
+    }
+    st6.free();
+    if (col.length > 0) {
+      row.collections = col;
     }
 
     if (preferences.use_bibtex) {
@@ -316,6 +338,7 @@ export const searchResources = async (q: string): Promise<RefData[]> => {
 
   async function updateCache(): Promise<RefData[]> {
     const data = await getData();
+    console.log(JSON.stringify(data));
     const fData = {
       zotero_path: preferences.zotero_path,
       use_bibtex: preferences.use_bibtex,
@@ -364,7 +387,8 @@ export const searchResources = async (q: string): Promise<RefData[]> => {
   } catch {
     try {
       ret = await updateCache();
-    } catch {
+    } catch(e) {
+      console.log(e)
       await showToast({
         style: Toast.Style.Failure,
         title: "Corrupt sqlite db!",
@@ -374,6 +398,7 @@ export const searchResources = async (q: string): Promise<RefData[]> => {
   }
 
   if (ret.length < 1) {
+    
     await showToast({
       style: Toast.Style.Failure,
       title: "No Data found in referred sqlite db!",
@@ -398,7 +423,7 @@ export const searchResources = async (q: string): Promise<RefData[]> => {
     shouldSort: true,
     includeMatches: false,
     findAllMatches: true,
-    minMatchCharLength: 3,
+    minMatchCharLength: 2,
     threshold: 0.1,
     ignoreLocation: true,
     keys: [
@@ -413,6 +438,10 @@ export const searchResources = async (q: string): Promise<RefData[]> => {
       {
         name: "tags",
         weight: 5,
+      },
+      {
+        name: "collections",
+        weight: 6,
       },
       {
         name: "date",

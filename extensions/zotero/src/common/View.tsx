@@ -49,6 +49,8 @@ ${item.abstractNote ? "**Abstract:** " + item.abstractNote : ""}
 
 ${item.tags ? "**Tagged With:** " + item.tags.join(", ") : ""}
 
+${item.collections ? "**Collections:** " + item.collections.join(", ") : ""}
+
 `;
 }
 
