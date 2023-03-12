@@ -1,55 +1,38 @@
-import { ActionPanel, Icon, List, showToast, Toast } from "@raycast/api";
-import { getFavicon } from "@raycast/utils";
+import { Icon, LaunchProps, List } from "@raycast/api";
 import { useState } from "react";
-import { CopyLinkActionSection, OpenLinkActionSections } from "./actions";
-import { databasePath, getQuery, useSQL } from "./sql";
+import { historyDatabasePath, getHistoryQuery } from "./sql";
 import { HistoryEntry } from "./types";
-import { getDomain, getLastVisitedAt } from "./utils";
-import { isPermissionError, PermissionErrorView } from "./permissions";
 import { VersionCheck } from "./version";
+import { HistoryEntryListItem } from "./list";
+import { useSQL } from "@raycast/utils";
 
-function SearchHistory() {
-  const [searchText, setSearchText] = useState<string>();
-  const { data, isLoading, error } = useSQL<HistoryEntry>(databasePath, getQuery(searchText));
+function SearchHistory(props: LaunchProps) {
+  const [searchText, setSearchText] = useState(props.fallbackText ?? "");
+  const { data, isLoading, permissionView } = useSQL<HistoryEntry>(historyDatabasePath, getHistoryQuery(searchText));
 
-  if (error) {
-    if (isPermissionError(error)) {
-      return <PermissionErrorView />;
-    } else {
-      showToast({
-        style: Toast.Style.Failure,
-        title: "Cannot search history",
-        message: error instanceof Error ? error.message : undefined,
-      });
-    }
+  if (permissionView) {
+    return permissionView;
   }
 
   return (
-    <List searchBarPlaceholder="Search history" isLoading={isLoading} onSearchTextChange={setSearchText}>
+    <List
+      searchBarPlaceholder="Search history"
+      searchText={searchText}
+      isLoading={isLoading}
+      onSearchTextChange={setSearchText}
+    >
       <List.EmptyView icon={Icon.MagnifyingGlass} title="Nothing found ¯\_(ツ)_/¯" />
       {data?.map((entry) => (
-        <List.Item
-          key={entry.id}
-          icon={getFavicon(entry.url)}
-          title={entry.title}
-          subtitle={getDomain(entry.url)}
-          accessories={[getLastVisitedAt(entry)]}
-          actions={
-            <ActionPanel>
-              <OpenLinkActionSections url={entry.url} />
-              <CopyLinkActionSection url={entry.url} title={entry.title} />
-            </ActionPanel>
-          }
-        />
+        <HistoryEntryListItem key={entry.id} entry={entry} searchText={searchText} />
       ))}
     </List>
   );
 }
 
-export default function Command() {
+export default function Command(props: LaunchProps) {
   return (
     <VersionCheck>
-      <SearchHistory />
+      <SearchHistory {...props} />
     </VersionCheck>
   );
 }

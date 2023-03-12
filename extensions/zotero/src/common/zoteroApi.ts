@@ -451,6 +451,10 @@ export const searchResources = async (q: string): Promise<RefData[]> => {
         name: "creators",
         weight: 4,
       },
+      {
+        name: "DOI",
+        weight: 1,
+      },
     ],
   };
 
